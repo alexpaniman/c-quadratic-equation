@@ -5,7 +5,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(equation-solver VERSION 1.0)
 
+enable_testing()
+
 add_subdirectory(lib)
+add_subdirectory(test)
 
 add_executable(equation-solver-front main.cpp)
 
