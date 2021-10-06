@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string.h>
+#include <ctype.h>
 #include <math.h>
 
 struct __test_framework_entry {
@@ -76,7 +77,7 @@ static inline bool __test_framework_assert_epsilon_equal(double x, double y) {
 }
 
 static inline void __test_framework_get_test_name_with_spaces(const char* const name,
-                                                                 char* const new_name) {
+                                                              char* const new_name) {
 
     const size_t length = strlen(name); 
     for (int i = 0; i < length; ++ i) {
@@ -87,6 +88,9 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
         else
             new_name[i] = symbol;
     }
+
+    // Capitalize first character
+    new_name[0] = toupper(new_name[0]);
 
     new_name[length] = '\0';
 }
@@ -113,10 +117,10 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
             char name_with_spaces[strlen(test_name) + 1];                                    \
             __test_framework_get_test_name_with_spaces(test_name, name_with_spaces);         \
                                                                                              \
-            printf(TEXT_FAILED("[==> FAILED! <==] Test %s") "\n", name_with_spaces);         \
+            printf(TEXT_FAILED("[==> FAILED! <==] Test \"%s\"") "\n", name_with_spaces);     \
                                                                                              \
             printf("In " TEXT_WARNING("%s:%u\n"), __FILE__, __LINE__);                       \
-            printf("In check %s:\n", TEXT_FAILED(#actual " == " #expected));                 \
+            printf("In check " TEXT_FAILED("%s") ":\n", #actual " == " #expected);           \
             printf("Expected: " TEXT_INFO(format) "\n", expected);                           \
             printf("  Actual: " TEXT_FAILED(format) "\n", actual);                           \
                                                                                              \
@@ -147,11 +151,40 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
     }                                                                                        \
     void __test_framework_test_##name(void)                                                  \
 
+static inline void __test_framework_entry_print_testing_stats(size_t failed_tests) {
+        size_t num_of_tests = __test_framework_current_state.used;
+
+        const size_t passed_tests = num_of_tests - failed_tests;
+
+        printf(TEXT_INFO("[==>  STATS  <==]") " ");
+
+        const size_t graph_length = 20;
+        const size_t failed_graph_length = failed_tests * graph_length / num_of_tests;
+
+        for (size_t i = 0; i < failed_graph_length; ++ i)
+            printf(TEXT_FAILED("-"));
+
+        for (size_t i = 0; i < graph_length - failed_graph_length; ++ i)
+            printf(TEXT_PASSED("+"));
+
+        printf("\n");
+
+        const double passed_percent = passed_tests * 100.0 / (double) num_of_tests; 
+        const double failed_percent = failed_tests * 100.0 / (double) num_of_tests; 
+
+        printf("Failed tests: " TEXT_FAILED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
+               failed_tests, failed_percent);
+
+        printf("Passed tests: " TEXT_PASSED("%zu") " " TEXT_INFO("%.0lf%%") "\n",
+               passed_tests, passed_percent);
+}
+
 #define TEST_MAIN()                                                                          \
     int main(void) {                                                                         \
         __test_framework_state *state = &__test_framework_current_state;                     \
         printf(TEXT_INFO("[==> MESSAGE <==] Running %zu tests") "\n", state->used);          \
                                                                                              \
+        int failed_tests = 0;                                                                \
         for (int i = 0; i < state->used; ++ i) {                                             \
             __test_framework_entry* entry = state->tests + i;                                \
                                                                                              \
@@ -170,7 +203,14 @@ static inline void __test_framework_get_test_name_with_spaces(const char* const 
                 printf(TEXT_WARNING("[==> WARNING <==] Test \"%s\" asserts nothing") "\n",   \
                        name_with_spaces);                                                    \
                                                                                              \
+            if (state->status < 0)                                                           \
+                ++ failed_tests;                                                             \
+                                                                                             \
             state->status = 0;                                                               \
         }                                                                                    \
+                                                                                             \
+        __test_framework_entry_print_testing_stats(failed_tests);                            \
+                                                                                             \
         __test_framework_free_test_list();                                                   \
+        return 0;                                                                 \
     }
