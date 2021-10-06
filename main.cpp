@@ -54,8 +54,12 @@ int main(void) {
     double b = read_coefficient("b");
     double c = read_coefficient("c");
 
-    equation_solution solution
-        = solve_quadratic_equation(a, b, c);
+    equation_solution solution;
+    int error_code = solve_quadratic_equation(a, b, c, &solution);
+    if (error_code != 0) {
+        printf("Illegal value for argument %d", error_code);
+        return error_code;
+    }
 
     print_solution_description(&solution);
 }

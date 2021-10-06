@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <stdio.h>
 #include <cmath>
 
@@ -8,59 +9,77 @@ static inline bool is_zero(const double value) {
     return fabs(value) <= 1e-9 /* EPSILON */;
 }
 
-equation_solution solve_linear_equation(const double b, const double c) {
-    if (!std::isfinite(b) || !std::isfinite(c))
-        return  { ILLEGAL_INPUT };
+int solve_linear_equation(const double b, const double c,
+                          equation_solution* const solution) {
+
+    if (!std::isfinite(b))
+        return 1;
+
+    if (!std::isfinite(c))
+        return 2;
+
 
     if (is_zero(b)) { // 0x == -c
         // 0x == 0
-        if (is_zero(c))
-            return  { INF_ROOTS };
+        if (is_zero(c)) {
+            *solution = { INF_ROOTS };
+            return 0;
+        }
 
         // 0x != 0
-        return  { FINITE_ROOTS, /* num roots */ 0 };
+        *solution = { FINITE_ROOTS, /* num roots */ 0 };
+        return 0;
     }
 
     // bx == -c
-    return  { FINITE_ROOTS, /* num roots */ 1, { - c / b } };
+    *solution = { FINITE_ROOTS, /* num roots */ 1, /* root */ { - c / b } };
+    return 0;
 }
 
-equation_solution
-    solve_quadratic_equation(const double a, const double b, const double c) {
+int solve_quadratic_equation(const double a, const double b, const double c,
+                             equation_solution* const solution) {
 
-    if (!std::isfinite(a) || !std::isfinite(b) || !std::isfinite(c))
-        return  { ILLEGAL_INPUT };
+    if (!std::isfinite(a))
+        return 1;
+
+    if (!std::isfinite(b))
+        return 2;
+
+    if (!std::isfinite(c))
+        return 3;
+
 
     double discriminant = b * b - 4 * a * c;
 
-    if (is_zero(a))
-        return solve_linear_equation(b, c);
+    if (is_zero(a)) { // a == 0 => This is a linear equation
+        int return_code = solve_linear_equation(b, c, solution);
+        return return_code == 0 ? 0 : /* one less argument */ return_code + 1;
+    }
 
     // Check for discriminant == 0
     if (is_zero(discriminant))
-        return  { FINITE_ROOTS, /* num roots */ 1, { - b / (2 * a) } };
+        *solution = { FINITE_ROOTS, /* num roots */ 1,
+                      /* root */ { - b / (2 * a) } };
 
-    if (discriminant < 0.0)
-        return  { FINITE_ROOTS, /* num roots */ 0 };
+    else if (discriminant < 0.0)
+        *solution = { FINITE_ROOTS, /* num roots */ 0 };
 
-    // From here discriminant is guaranteed to be bigger than zero
-    double sqrt_from_discriminant = sqrt(discriminant);
+    else {
+        // From here discriminant is guaranteed to be bigger than zero
+        double sqrt_from_discriminant = sqrt(discriminant);
 
-    double root1 = (-b + sqrt_from_discriminant) / (2 * a),
-           root2 = (-b - sqrt_from_discriminant) / (2 * a);
+        double root1 = (-b + sqrt_from_discriminant) / (2 * a),
+            root2 = (-b - sqrt_from_discriminant) / (2 * a);
 
-    return  { FINITE_ROOTS, /* num roots */ 2, { root1, root2 } };
+        *solution = { FINITE_ROOTS, /* num roots */ 2, { root1, root2 } };
+    }
+
+    return 0;
 }
 
-int describe_equation_solution(const equation_solution* solution,
-                               int buffer_size, char *buffer) {
-    // This value changes:         ^~~~~~~~~~~
-
-    // I could define buffer_size as size_t and avoid this check
-    // but mixing unsigned and signed types could lead to unexpected
-    // errors, so I stick with this:
-    if (buffer_size < 0)
-        return -1;
+int describe_equation_solution(const equation_solution* const solution,
+                               size_t buffer_size, char* const buffer) {
+    // This value changes:            ^~~~~~~~~~~
 
     switch (solution->status) {
     case FINITE_ROOTS: {
@@ -80,7 +99,7 @@ int describe_equation_solution(const equation_solution* solution,
         // in case buffer is NULL. It's not the case with C99 and later,
         // but let's take precaution anyway:
         if (written_total < 0)
-            return -2;
+            return NULL_BUFFER_IS_NOT_SUPPORTED;
 
         for (int i = 0; i < number_of_roots; ++ i) {
             char* shifted_buffer = buffer;
@@ -115,10 +134,7 @@ int describe_equation_solution(const equation_solution* solution,
     case INF_ROOTS:
         return snprintf(buffer, buffer_size, "This equation has infinite number of roots");
 
-    case ILLEGAL_INPUT:
-        return snprintf(buffer, buffer_size, "Solving failed due to illegal input");
-
     default:
-        return -3;
+        return CORRUPTED_SOLUTION;
     }
 }
